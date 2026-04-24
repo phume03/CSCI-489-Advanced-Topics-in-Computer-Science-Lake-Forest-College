@@ -472,6 +472,136 @@ Parse   scans x
 Parse--accept
 
 
+### Top-Down Parsing using a Parsing Table ###
+
+	As an alternative to recursive descent parsing, one can write a parser making use of a parsing table.  The steps in the process can be automated, leading to the development of “parser-writing” programs, also called parser-generators.
+
+Consider the following simple “arithmetic” grammar:
+E  E + T | T
+T  T * F | F
+F  idr | (E)
+
+Step 1:  Remove left recursion (using our standard technique)
+E  TE’
+E’  +TE’ | 
+T  FT’
+T’  *FT’ | 
+F  (E) | idr
+
+Step 2:  Compute the sets “FIRST” and “FOLLOW”
+
+FIRST—the terminals that can begin a string derivable from a grammar symbol
+
+FIRST(E) = FIRST(T) = FIRST(F) = { idr, ) }
+
+FIRST(E’) = { + ,  }		FIRST(T’) = { *,  }
+
+
+FOLLOW—terminals that can immediately follow a nonterminal in a derivation
+
+FOLLOW(E) = FOLLOW(E’) = {  ), $ }
+
+FOLLOW(T) = FOLLOW(T’) = { +, ) , $ }
+
+FOLLOW(F) = ( *, +, ) $ }
+
+(Note:  The “FIRST” sets can, at least in this example, be determined by inspection.
+
+To determine follow of A, look for production rules with A on the right-hand-side.
+
+If a production rule looks like this:  B YAX, then FOLLOW(A) contains FIRST(X)
+
+If a production rule looks like this:  BYA, then FOLLOW(A) contains FOLLOW(B)
+
+If a production rule looks like this:  BYAX where  is in FIRST X, then FOLLOW(A) contains FOLLOW(B)
+Step 3:  
+
+Construct the parsing table.  The rows are indexed by the nonterminals and the columns are indexed by the terminals and the endmarker.
+
+The entries in the table are productions.  Given a production of the form A, place this into the table in row A and column x where x is any terminal in FIRST().
+
+If  is in First(), then also place the production into the table in row A and column x where x is any terminal in FOLLOW(A).  
+
+Following these two rules, we obtain the following table:
+
+
+
+	idr		+		*		(		)		$
+
+E	ETE’						ETE’
+
+E’			E’+TE’					E’		E’
+
+T	TFT’						TFT’
+
+T’			T’e		T’*FT’			T’ 		T’		
+
+F	Fidr						F(E)
+
+
+The Parsing Algorithm:
+
+Initialize the stack to $ and the start symbol (in this example, E), with the start symbol on top.
+
+Compare the top of the stack X to the current scanned symbol a.
+	If X = a = $, then accept
+	If X = a ≠ $, then pop X and scan next symbol
+	If X is a nonterminal and X ≠ a, then reject
+	If X is a nonterminal, look in the table at row X, column a.  
+		If no entry, then reject string
+		If we find Xw1w2….wn, pop x and push wn…w2w1 (w1 on top)
+
+ 
+Example:  Parse x*(y+z)
+Stack			Symbol		Production
+$E			x			ETE’
+
+$E’T			x			TFT’
+
+$E’T’F			x			Fidr
+
+$E’T’x			x
+
+$E’T’			*			T’*FT’
+
+$E’T’F*			*
+
+$E’T’F			(			F(E)
+
+$E’T’)E(		(
+
+$E’T’)E			y			ETE’
+
+$E’T’)E’T		y			TFT’
+
+$E’T’)E’T’F		y			Fidr
+
+$E’T’)E’T’y		y			
+
+$E’T’)E’T’		+			T’
+
+$E’T’)E’		+			E’+TE’
+
+$E’T’)E’T+		+
+
+$E’T’)E’T		z			TFT’
+
+$E’T’)E’T’F		z			Fidr
+
+$E’T’)E’T’z		z		
+
+$E’T’)E’T’		)			T’
+
+$E’T’)E’		)			E’
+
+$E’T’)			)		
+
+$E’T’			$			T’
+
+$E’			$			E’
+
+$			$			accept
+
 
 - - - ---
 
