@@ -603,6 +603,516 @@ $E’			$			E’
 $			$			accept
 
 
+## Intermediate representations and semantic routines ##
+
+CS 489--Quadruples (Part 1)
+
+	An alternative (to postfix) form of intermediate code is called quadruples.  The general form of a quadruple is:  
+
+	<operator>  <operand1>  <operand2>  <result>
+
+Because quadruples are "closer" to machine code than postfix, they are often used for compilers.  The structure of quadruples also aids in code optimization because of the ease with which the order of the quadruples can be altered.
+
+Example:  a * b might be represented as:  *   a   b   T, where T is some temporary location which stores the result of the multiplication.  
+
+A typical sequence of quadruples will contain temporaries for most results.  Temporary locations will also appear in the operand positions for many quadruples.  And we should observe that in the case of a unary operator, one of the operand fields will be blank.
+
+Example:  - (a*b + c*d)
+
+	*	a	b	T1
+
+	*	c	d	T2
+
+	+	T1	T2	T3
+
+	-		T3	T4        (this is unary minus)
+
+
+As with postfix notation, we would like to generalize quadruples to handle other programming constructs.
+
+BR	i	branch to the ith quadruple
+
+BZ	i	P	branch to the ith quadruple if P is zero
+
+:=		P1	P2	store the value of P1 into P2
+
+
+CVIR		a	T	convert value of a from an integer to a real, store in T
+
+
+SUBS	A	5	T	compute value of address of A[5] and store in T
+
+ 
+Consider the following example:
+
+	if  i > j then
+		
+		k := k + m*6
+
+	else
+	
+		i := i + 1
+	
+	fi
+
+The quadruple sequence might look like this:
+
+1.  	-	i	j	T1
+
+2.	BMZ		?	T1    //? needs to be fixed up
+
+3.  	*	m	6	T2
+
+4.  	+	k	T2	T3
+
+5.  	:=		T3	k
+
+6.  	BR		?		//? needs to be fixed up
+
+7.  	+	i	1	T4
+
+8.  	:= 		T4	i
+
+
+	After fixup, first ? is 7.  After fixup, second ? is 9
+
+
+Note how much closer to machine language the quadruple approach is.  If we could efficiently manage temporary locations, we could "easily" generate object code.
+
+
+Let us investigate how to generate quadruples for arithmetic expressions using a bottom up parser.  This approach will mirror the approach that we followed for generating postfix using a bottom up parser.  (See last two pages of the handout Intermediate Code, Part 2.)
+ 
+Consider the following simple arithmetic grammar, with the production rules numbered as indicated:
+
+	E  T 1 | E + T  2 | E – T  3 | -T   4
+
+	T  F   5  | T * F   6  | T / F    7
+
+	F  idr    8  | (E)   9
+
+Let's examine the attempted parse of the string a*(b+c).
+
+As we parse, we would like to construct the following two quadruples:
+
+	+	b	c	T1
+
+	*	a	T1	T2
+
+Following the bottom-up shift-reducing parser, we might expect the following parse stack sequence:
+
+a
+F
+T
+T*
+T*(
+T*(b
+T*(F
+T*(T
+T*(E
+T*(E+
+T*(E+c
+T*(E+F
+T*(E+T
+T*(E      
+	Now it is at this time, when we do the reduction based on production rule 2, when it would be logical to generate the addition quadruple.  But notice what has happened.  We have replaced the variable names in the parse stack so we don't know what sort of addition quadruple to generate.  
+
+	What we must do is save the variable names as "semantic information" associated with the nonterminals E, T, and F.
+
+ 
+Instead of constructing this tree:
+
+				E
+			            /  \
+			          E     \
+			           |       \
+          	T		          T        T
+	 |		           |         |
+      	F		          F        F
+	|          		           |        |
+       	a	 *             (       b +   c      )
+
+
+We want to construct this tree:
+
+				ET1
+			            /  \
+			          Eb    \
+			           |        \
+          	Ta		          Tb       Tc
+	 |		           |          |
+      	Fa		          Fb       Fc
+	|          		           |          |
+       	a	 *             (       b +   c      )
+
+
+To accomplish this, we will keep a parse stack and a name stack concurrently.  Whenever we put a name token onto the parse stack, we put the symbol table position on the name stack at the same stack position.
+
+
+Parse Stack:  	T	*	(	E	+	T
+
+Name Stack:  	a			b		c
+
+
+Now let's look at some (pseudo) code for generating quadruples.  As with generating postifx, we'll assume that the shift-reduce parser will call this routine whenever it is about to make a reduction.  The parser will pass the semantic analyzer the number of the production rule involved in the reduction.  
+
+The parser will place items on the parse stack and will also manage the stack pointer (sp).  The semantic routine will maintain the name stack, will manage the temporary locations, and will generate the quadruples.
+
+ 
+We'll assume that locations larger than 1000 are for temporary values.  To do this, we'll use a counter t, initialized to 1000.  We'll also assume that the quadruples are stored in a 2-dimensional array.  The counter qc will point to the next quadruple to be generated.
+
+The first semantic routine simply generates the quadruples:
+
+void generate(int opr, opd1, opd2, res)  {
+
+   	quad[qc,1] = opr;
+	quad[qc,2] = opd1;
+	quad[qc,3] = opd2;
+	quad[qc,4] = res;
+	++qc:
+}
+
+The next routine is the main semantic analyzer, consisting of one lengthy switch statement.
+
+void quadBuilder(int ruleNum)  {
+
+switch (ruleNum)   {
+
+	case 1:  break;
+
+	case 2:  generate(plus, NS[sp-2], NS[sp], ++t) ; NS[sp-2]=t; break;
+
+	case 3:  generate(minus, NS[sp-2], NS[sp], ++t) ; NS[sp-2]=t; break;
+
+	case 4:  generate(uminus, 0, NS[sp], ++t) ; NS[sp-1]=t; break;
+
+	case 5:  break;
+
+	case 6:  generate(star, NS[sp-2], NS[sp], ++t) ; NS[sp-2]=t; break;
+
+	case 7:  generate(slash, NS[sp-2], NS[sp], ++t) ; NS[sp-2]=t; break;
+
+	case 8:  break;
+
+	case 9:  NS[sp-2] = NS[sp-1]; break
+
+	default:  halt("Invalid production rule number.")
+
+       }
+} 
+As always, let us trace through the recognition of a string.  PS denotes the contents of the parse stack and NS denotes the contents of the name stack.  The production rule numbers are displayed after the step numbers.
+
+a * (b + c)
+
+1. 	PS:					11. 	PS:   T  *  (  E  +
+	NS:						NS:   a          b
+
+2.	PS:  a					12.	PS    T  *  (  E  +  c
+	NS:  a						NS:   a          b      c
+
+3.    8 	PS:  F					13.  8	PS:  T  *  (  E  +  F
+	NS:  a						NS:  a          b      c
+
+4.    5	PS:  T					14.  5	PS:  T  *  (  E  +  T
+	NS:  a						NS:  a          b       c
+
+5.  	PS:  T *				15.  2	PS:  T  *   (   E		+   b   c   T1
+	NS:  a						NS:  a            T1
+
+6.  	PS:  T * (				16.	PS:  T   *   (   E   )
+	NS:  a						NS:  a             T1
+
+7.  	PS:  T * ( b				17:  9	PS:  T   *   F
+	NS:  a       b					NS:  a        T1
+
+8.   8  	PS:  T * ( F				18:  6	PS:  T 			*   a   T1   T2
+	NS:  a       b					NS:  T2
+
+9.   5	PS:  T * ( T				19:  1	PS:  E
+	NS:  a       b					NS:  T2
+
+10.  1 	PS:  T * ( E
+	NS:  a       b
+
+
+CS 489--Quadruples (Part 2)
+
+	In this handout we consider how to generate quadruples for conditional and loop constructs.  The quadruples will again be stored in a 2-dimensional table, with a qc pointing to the next quadruple to be generated.  We will use 3 extra stack fields in addition to the parse stack.  One of these will keep track of names, as in the previous handout, while the other two will help us keep track of branching quadruples.
+
+Quadruples for Conditional statements
+
+Suppose we have the following pertinent grammar rules:
+
+<st1>  <if clause> <st2> fi | <if clause> <st2> else <st3> fi
+
+<if clause>  if <expr> then
+
+(Note:  For convenience we will assume that expression is integer valued, with 0 meaning false and 1 meaning true.)
+
+If there is no “else” part, we want to generate the following:
+
+	Quadruples for <expr> with result in T
+	BZ  	n2	T	0
+ 	Quadruples for <st2>
+n2	…..
+
+Question:  When is the logical time to generate the BZ quadruple?  
+Answer:  When if <expr> then is about to be reduced to <if clause>.  Of course, at this point, we don’t know the destination n2.
+
+Also note that there will be a second reduction for the “if with no else”, namely when <if clause> <st2> fi is reduced to <st1>.  At this point, the quadruples for <st2> will have been generated, so we can “fixup” the BZ quadruple.
+
+Here is a picture of the stack during these two reductions:
+
+PS:	if	<expr>	then		Before first reduction
+NS:		T
+JS:
+				sp
+
+PS:	<if clause>				After first reduction
+NS:
+JS:	pos of BZ
+	    sp
+PS:	<if clause>	<st2>	fi		Before second reduction
+NS:		
+JS:
+				sp
+
+PS:	<st1>					After second reduction
+NS:
+JS:
+
+
+Here are the code segments corresponding to the appropriate grammar rules:
+
+<if clause>  if <expr> then:
+
+	JS[sp-2] = qc;
+	Generate(BZ, 0, NS[sp-1], 0);    // the first 0 needs to be fixed up
+
+
+<st1>  <if clause> <st2> fi	:
+
+	quad[ JS[sp-2], 2] = qc;
+
+
+What if an else part is present?  Then we would like to generate the following sequence:
+
+Part 1:  	quadruples for <expr> result in T
+
+Part 2:		BZ 	n1	T	
+
+Part 3:		quadruples for <st2>
+
+Part 4:		BR	n2
+
+Part 5:      n1    quadruples for <st3>
+	     n2   …….
+
+If we look at the tree corresponding to the grammar, we see that, in addition to the fixup issues, which we can handle, we have a more serious problem:
+
+		<st1>
+              /			\          \           \         \
+ <if clause>         		  \ 	 \	 \        \
+ /        |           \                                 \          \            \        \
+if  <expr>  then		<st2>	else	<st3>	fi
+
+The logical time to generate quadruples is when a handle is being reduced to its left-hand-side nonterminal.  We can generate Parts 1 and 2 during the first reduction.  Since there is only one more reduction, we must generate all the quads at that time.  But unfortunately, before the second reduction, the quads for <st2> and <st3> have already been generated by their respective actions and we had no chance to insert Part 4 between Parts 3 and 5.  In essence, the syntax of the grammar is too coarse.
+A solution:  Refine the syntax to fit the semantics.
+
+<st1>    <if clause> <st2> fi  | <fullCond> <st3> fi  
+
+<fullCond>  <if clause> <st2> else
+
+<if clause>  if <expr> then
+
+Note that, in the case of an else clause (a full conditional), we have an extra reduction, which gives us an extra opportunity to generate quadruples.
+
+Here are snapshots of the stack for the “full conditional” after the <if clause> reduction:
+
+PS:	<if clause>				After <if clause> reduction
+NS:		
+JS:         pos of BZ
+	sp
+
+PS:	<if clause>	<st2>	else		Before <fullCond> reduction
+NS:
+JS:	pos of BZ
+	    		              sp
+
+PS:	<fullCond>				After <fullCond> reduction
+NS:		
+JS:        	pos of BR
+	sp
+
+PS:	<fullCond>	<st3>	fi		Before  <st1> reduction
+NS:
+JS:	pos of BR
+				sp
+
+PS:	<st1>					After  <st1> reduction
+NS:
+JS:	pos of BR
+	sp
+
+
+Here are the code segments corresponding to the appropriate grammar rules:
+
+<fullCond>  <if clause> <st2> else:
+
+	generate(BR, 0, 0, 0);
+       	quad[ JS[sp-2] , 2 ] = qc;
+	JS[ sp-2] = qc-1
+
+
+<st1>  <fullCond> <st3> fi:	:
+
+	quad[ JS[sp-2], 2] = qc;
+
+
+
+
+Quadruples for Loop Statements
+
+Now let’s do a similar analysis for a loop statement.  Consider a loop of the following form:
+
+<st1>  for <var> := <expr1> step <expr2> until <expr3> do <st2> od
+
+
+Semantics:  This loops executes like a typical “for” loop with the following explicit semantics:  
+
+	<expr2> > 0
+
+	<expr2> and <expr2> are evaluated before each repetition of the loop
+
+Here is an appropriate sequence of quadruples for this construct:
+
+	Quadruples for <var> := <expr1>
+	BR	n2
+n1	quadruples for <var> := <var> + <expr2>
+n2	quads for T := <expr3>
+	BP	n3	<var> 	T
+	Quadruples for <st2>
+	BR	n1
+n3
+
+ 
+With only one grammar rule, it is clear that the syntax is too course to be able to insert the jump quadruples.  So we refine the grammar to:
+
+<for1>  for <var> := <expr1>
+
+<for2>  <for1> step <expr2>
+
+<for3>  <for2> until <expr3>
+
+<st1>  <for3> do <st2> od
+
+
+Here are snapshots of the parse stack and the other fields.  Note that we use two extra fields to keep track of the jump quadruples.
+
+
+PS:	for	<var>		:=	<expr1>	Before <for1> reduction
+NS:		symTable		Temp
+JS1: 	
+JS2:
+
+					sp
+
+PS:	<for1>						After <for1> reduction
+NS:	symTable
+JS1:	pos of 1st BR
+JS2:     	n1
+sp
+
+PS:	<for1>		step	<expr2>		Before <for2> reduction
+NS:	symTable		T’	
+JS1:     	pos of 1st BR	
+JS2:       n1
+				sp
+
+PS:	<for2>						After  <for2> reduction
+NS:	symTable		
+JS1:	pos of BP		
+JS2:	n2
+	sp
+
+PS:	<for2>		until	<expr3>		Before  <for3> reduction
+NS:	symTable		T’’
+JS1:	pos of BP
+JS2:	n1
+				sp
+
+PS:	<for3>						After  <for3> reduction
+NS:	symTable		
+JS1:	pos of BP		
+JS2:	n1
+	sp
+
+PS:	<for3>		do	<st2>		od	Before  <st1> reduction
+NS:	symTable		
+JS1:	pos of BP
+JS2:	n1
+						sp
+
+PS:	<st1>						After <st1> reduction
+NS:
+JS1:
+JS2:
+	sp
+
+
+Here are the code segments corresponding to the appropriate grammar rules:
+
+<for1>  for <var> := <expr1>
+
+	generate( asgn, NS[sp], 0, NS[sp-2] );
+	NS[sp-3] = NS[sp-2];
+	JS1[sp-3] = qc;
+	generate(BR, 0, 0, 0)
+	JS2[sp-3] = qc
+
+
+<for2>  <for1> step <expr2>
+
+	generate( plus, NS[sp-2], NS[sp], NS[sp-2] )
+	quad[ JS1[sp-2], 2 ] = qc;
+
+<for3>  <for2> until <expr3>
+
+	JS1[sp-2] = qc;
+	generate( BP, 0, NS[sp-2], NS[sp] )
+
+<st1>  <for3> do <st2> od
+
+	generate( BR, JS2[sp-3], 0, 0 );
+	quad [ JS1[sp-3], 2 ] = qc
+ 
+The above code should generate the following pattern:
+
+Quadruples for <expr1>, result in T
+
+:=	T		<var>
+
+BR	?				// fixed up as n2
+
+n1	quads for <expr2>, result in T’
+
+	+ 	<var> 	T’	<var>
+
+n2	quads for <expr3>, result in T’’
+
+	BP	?	<var>	T		// fixed up as n3
+
+	Quadruples for <st2>
+
+	BR	n1
+
+n3
+
+	
+
+
+
+
+
 - - - ---
 
 ### GRADING INFORMATION ###
