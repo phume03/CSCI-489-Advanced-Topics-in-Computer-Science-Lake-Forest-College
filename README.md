@@ -18,13 +18,13 @@ The course outline is:
 +	Introduction
 +	Lexical Analysis
 +	Syntactic Analysis
-  +	Top-down parsing and recursive descent
-  +	Bottom-up parsing and the simple precedence technique
+    +	Top-down parsing and recursive descent
+    +	Bottom-up parsing and the simple precedence technique
   
 +	Intermediate representations and semantic routines
-  +	Reverse Polish
-  +	Quadruples
-  +	Semantic routines with bottom-up parsing
+    +	Reverse Polish
+    +	Quadruples
+    +	Semantic routines with bottom-up parsing
   
 +	Interpreters
 +	Simple code generation
