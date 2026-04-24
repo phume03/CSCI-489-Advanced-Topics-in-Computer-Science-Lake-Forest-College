@@ -603,6 +603,207 @@ $E’			$			E’
 $			$			accept
 
 
+### Bottom-up Parsing ###
+
+In general, bottom-up parsing attempts to construct a parse tree from an input string by beginning at the leaves and working up the root.  Essentially, as we scan, we look for a right-hand-side of a production rule (called a handle) that we can replace by its left-hand-side nonterminal.  Such a replacement is called a reduction.  So bottom-up parsing is performed by finding and reducing handles.
+
+Bottom-up parsing often reverses a right-most derivation, that is, a derivation that replaces the rightmost nonterminal at every stage.  Because we reverse a right-most derivation, there are no nonterminals to the right of the handle.  This allows us to scan and parse simultaneously.
+
+Simple precedence parsing
+
+We define three relations on grammar symbols based only in terms of the grammar rules.
+
+R = S if there exists a rule of the form U ::= …..RS…..
+
+R < S if there exists a rule of the form U ::= ….. RV such that some string of terminals and/or nonterminals beginning with S is derivable from V in one or more steps.  Note that this requires V to be a nonterminal.
+
+R > S if S is a terminal and there exists a rule of the form U ::=    …..VW….. such that some string ending in R is derivable from V in 1 or more steps (so V is a nonterminal) and some string beginning with S is derivable from W in 0 or more steps (so W may be a terminal or a nonterminal).
+
+Example:
+
+Z ::= bMb
+M ::= (L | A
+L ::= Ma)
+
+=
+ b = M	M=b
+ ( = L	
+ M = a   a = )
+
+<
+b < (	b < a
+( < M   ( < (   ( < a
+
+ 
+>
+L > b	A > b	) > b
+L > a	A > a	) > a
+
+Let’s store these relations in a table:
+
+	Z	b	M	L	a	(	)
+
+Z	
+
+b			=		<	<
+
+M		=			=
+
+L		>			>
+
+a		>			>
+
+(			<	=	<	<
+
+)		>			>
+
+
+A grammar is a simple-precedence grammar or a (1,1) precedence grammar if at most 1 relation holds between every pair of symbols.  The (1,1) refers to the fact that we use one symbol on each side of a possible handle to help us decide if it is a handle or not.  
+
+Theorem:  All simple precedence grammars are unambiguous.  The unique handle of any sentential form S1….Sn is the leftmost substring Sj..Si such that 
+
+Sj-1 < Sj = Sj+1 = … = Si > Si+1
+
+The parsing algorithm:
+
+Repeatedly scan tokens pushing them onto a parse stack until the top symbol > token being scanned.  At this point, the handle is in the stack--the last symbol of the handle is the top of the stack.   Using the above theorem, determine the first symbol of the handle.
+
+Look up the handle in the grammar and replace it on the stack with the appropriate nonterminal.
+
+Reduce again (if necessary)
+
+Introduce a delimiter symbol, say #, which precedes and follows the source string.  Set # < all other symbols and all other symbols > #.
+
+The parser accepts an input string when the stack contains # at the bottom with only the start symbol of the grammar above it, and the symbol being scanned is the terminating #.
+
+Parse example:  using the previous table, show the parse of:  #b(aa)b#
+
+Stack			Relation		Symbol Scanned
+
+#			<			b
+
+#<b			<			(
+
+#<b<(			<			a
+
+#<b<(<a		>			a
+
+#<b<(<M		=			a
+
+#<b<(<M<a		=			)
+
+#<b<(<M<a=)	>			b
+
+#<b<(=L		>			b
+
+#<b=M		=			b
+
+#<b=M=b		>			#
+
+#<Z						#
+		accept
+
+
+Operator Precedence
+
+One can also build precedence tables based on the desired precedence of operators.  That is, the relations aren’t determined by the grammar rules but by the rules of precedence.  In these situations, we are dealing with “operator precedence” grammars which have the property that there are no two adjacent nonterminals.
+
+Let’s consider the following simple grammar:
+
+E ::= E + E | E – E | E * E | E / E | E ^ E | (E) | idr
+ 
+Here are the rules for generating the precedence table:
+
+If 1 has higher precedence than 2, then set 1 < 2 and also set 2 < 1.
+
+Significance:  In an expression like E 2 E 1 E, the parser will recognize E 1 E as the handle (i.e., will parse as E 2 (E 1 E)).
+
+If 1 and 2 have equal precedence, then if the operators lave left associativity, make 1 > 2 and 2 > 1.  If the operators are right associative, make 1 < 2 and 2 < 1.
+
+Significance:  In an expression like x / y / z, the parser will parse as (x/y)/z.  And in an expression like x ^ y ^ z, the parser will parse as x ^ (y ^ z).
+
+Add the following relations:
+
+ < id 		 < (		) > 
+id > 		( < 		 > )
+
+( = )		) > )		id > )
+( < (
+( < id
+
+For the delimiter $:
+
+$ < 		 > $
+$ < id		id > $
+$ < (		) > $
+
+These last several relations allow $ to serve as the delimiter and also force both id to and (E) to get reduced to E whenever found.
+
+Handling Unary Operators
+
+If we have a unary operator, called !, then we use the following rules:
+
+Make  < ! for any operator , whether unary or binary.  This ensures that E  !E is always parsed as E  (!E).
+
+Make ! >  if ! has higher precedence than .  This will ensure that ! E  E will parse as (!E)  E.
+
+Make ! <  if  has higher precedence than !.  This will ensure that ! E  E will parse as ! (E  E).
+
+Example from preceding arithmetic grammar:
+
+	+	-	*	/	^	id	(	)	$
+
++	>	>	<	<	<	<	<	<	>
+
+-	>	>	<	<	<	<	<	<	>
+
+*	>	>	>	>	<	<	<	>	>
+
+/	>	>	>	>	<	<	<	>	>
+
+^	>	>	>	>	<	<	<	>	>
+
+id	>	>	>	>	>			>	>
+
+(	<	<	<	<	<	<	<	=
+
+)	>	>	>	>	>			>	>
+
+$	<	<	<	<	<	<	<
+
+ 
+Parse:  $ id – id ^ id / id $
+
+Stack			Relation	Token Scanned
+
+$ 			<		id
+$ id			> 		-
+$ E - 			<		id
+$ E – id		> 		^
+$ E – E			<		^
+$E – E ^ 		< 		id
+$E – E ^ id		>		/
+$E – E ^ E		>		/
+$E – E 			< 		/
+$E – E /		<		id
+$E – E /id		> 		$
+$ E – E / E		>		$
+$ E – E			> 		$
+$ E			>		$
+	accept
+
+Note how the parse respects the precedence of operations, exponentiating first, then dividing, and finally subtracting.
+
+Some final remarks:
+
+1.	When a unary operator is also a binary operator (like the minus symbol), one approach is to let the lexical analyzer determine the difference between the two operators.  This might require the scanner to occasionally “back up”.
+
+2.	In the early days of compiler writing, memory was very expensive and the amount of space for the two-dimensional table was a major concern.  There is a very nice mathematical development that uses graph theory to create  a pair of precedence functions.  These functions replace the matrix, requiring 2n storage locations instead of n2 locations.  
+
+3.	As is typical in computer science, there is a tradeoff for using memory more efficiently.  And that is that the precedence functions don’t have any “holes” in the table.  These holes are helpful because they indicate syntax errors.  Of course, a parser using precedence functions will still accept/reject a string correctly, but it might take the parser several more steps to recognize the error.  (We will examine precedence functions later, if time permits.)
+
+
+
 ## Intermediate representations and semantic routines ##
 
 CS 489--Quadruples (Part 1)
