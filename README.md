@@ -218,6 +218,260 @@ Transition Diagrams
 A design aid for writing scanners is the transition diagram for finite-state automata.  These diagrams are described briefly in the “Guide to Writing a Scanner” handout.
 The use of these diagrams is essentially the basis for “scanner-generator” programs.
 
+## Syntactic Analysis ##
+
+
+### Top-Down Parsing ###
+
+
+In top-down parsing, we try to build the syntax tree by starting at the root and working down to the leaves.  Essentially, we try to replace nonterminals (left-hand sides of production rules) with an appropriate right-hand-side of a production rule.
+
+In a naïve approach, we simply pick an alternative right-hand-side.  If that choice turns out to be incorrect, we backtrack and try another alternative.  We can see a “bad” backtracking example if we try to parse idr + idr from the grammar that follows:
+
+	E ::= T + E | T
+	T ::= F *  T | F
+	F ::= (E) | idr
+
+
+This backtracking is highly inefficient and is, in fact, of exponential complexity in terms of the length of the string being parsed.  A compile needs to be of linear complexity to be useful.  
+
+Also note that a “backtracking” parser might be difficult to implement, particularly if the parser and the scanner are working together as they often are, with the scanner under the control of the parser.  
+
+	Suppose we rewrite the above grammar in perhaps a more natural way (that forces left-to-right evaluation of addition and multiplication):
+
+	E ::= E + T | T
+	T ::= T * F | F
+	F ::= (E) | idr
+
+Now when we try to parse idr + idr, we have a different problem (if we always try the first right-hand-side alternative).  Namely, the left recursion sends us into an infinite loop.
+
+Thus, if we want a practical top-down parser (that builds the tree by scanning from left-to-right), we need to eliminate backtracking and left recursion.     We consider two different ways to avoid these problems.  One technique is to use theorems from “grammar theory”.  Another way is to allow additional descriptive devices for our grammar rules.
+
+ 
+For the first technique, let’s look at the following result:
+
+Theorem:  Given a context-free grammar, there is an algorithm that constructs an equivalent grammar without left-recursion.
+
+
+We consider this result in steps:
+
+Lemma 1:  Given a grammar with -productions (where  represents the null string), we can algorithmically construct an equivalent grammar with no  -productions.
+
+
+Lemma 2:  Given a grammar with unit productions (of the form AB), we can construct an equivalent grammar without unit productions.
+
+
+Lemma 3:  Given a grammar with direct left recursion, we can construct an equivalent grammar without left recursion.
+
+
+Lemma 4:  Given a grammar with indirect left recursion, we can construct an equivalent grammar without indirect left recursion.
+
+
+
+To get rid of backtracking, we essentially need to always choose the correct alternative on the first try on the basis of the next token.  Many programming languages are designed with this feature build in.  For example, in most programming languages, each of the different kinds of statements begins in a unique way.   For languages that don’t have this feature, we can use the technique of “left-factoring”.  For example, if a language has the production rules:  A   |  , we can replace these rules with A   A’ and A’   | .
+
+
+
+	To see how we can alter our “grammar-writing conventions to deal with this problem, we look at something called extended-BNF notation.  (Regular BNF notation is the production-writing rules allowed in the definitions of grammars.  B stands for Backus, one of the language designers of FORTRAN, and N stands for Naur, one of the designers of Algol.)
+
+ 
+In extended BNF we allow the following symbols:
+
+{ }  -- arbitrary repetition of the enclosed element
+
+[ ] – optional occurrence of the enclosed element
+
+( )  -- alternative choices (separated by the | symbol)
+
+
+Examples:
+
+E  E + T | T  becomes E  T { + T }
+
+<cond>  if <cond> then <st> fi | if <cond> then <st> else <st> fi
+
+becomes
+
+<cond>  if <cond> then <st>  [ else <st>  ] fi
+
+
+U  Vx 
+V  Uy | z
+
+becomes
+
+U  Vx
+V  z { xy }
+
+
+E  E + T | E – T | T is replaced by E  E {  ( + | - ) T }
+
+	
+
+	If we can write a grammar in such a way that we can always predict the correct alternative based on the next token, then the grammar is said to be an LL(1) grammar.    (The first L indicates that the string is being scanned from left to right.  The second L means we are building a leftmost derivation, which means we are replacing the leftmost nonterminal in each intermediate string.  The 1 means that we need one token of “lookahead”.  
+
+ 
+Remarks:
+
+
+1.	In general, there are LL(k) grammars that require k tokens of lookahead.
+
+
+2.	LL(1) grammars may require a program terminator to that the parser knows when the program is over.
+
+
+3.	A left-recursive grammar is not (LL1). But non left-recursive grammars need not be LL(1) either.
+
+
+4.	There are standard transformation techniques to convert many grammars into LL(1) grammars.
+
+
+
+Here are some theoretical results concerning LL(1) grammars:
+
+“Negative”
+
+
+
+Theorem:  There are context free languages that have no LL(1) grammar.
+
+
+Theorem:  There is no algorithm that can determine whether an arbitrary context free language has an LL(1) grammar that defines it.
+
+
+
+“Positive”
+
+
+Theorem:  There is an algorithm that can determine whether an arbitrary context-free grammar is an LL(1) grammar.
+
+
+
+
+Theorem:  There is an algorithm that can determine whether two arbitrary LL(1) grammars generate the same languages.
+
+
+The Recursive Descent method
+
+	Probably the most natural implementation
+
+	One recursive method is written for each nonterminal symbol
+
+	Might be useful to have a “terminator” symbol
+
+	Any such algorithm will typically need a stack and a representation of the grammar
+
+	The stack is managed by the recursive calls
+
+	The methods represent the grammar
+
+Example:  Simple arithmetic with + and *
+
+E  T | E + T
+T  F | T * F
+F  idr | (E)
+
+First rewrite in Extended-BNF:
+
+E  T { + T }
+T  F { *F  }
+F  idr | (E)
+
+void parse()		void E()			void T()
+    tok = scan()	    	    T()				    F()
+     E()			     while tok == plus		    while tok == star
+				Tok = scan()			tok = scan()
+				T()				F()
+void F()
+    if tok == idr
+        tok = scan()
+    else if tok == lpar
+	      tok = scan()
+	      E()
+	      if tok != rpar
+		error(“Missing Right Parenthesis”)
+	      else
+		tok = scan()
+	else
+	      error(“Illegal factor”)
+Example:  Parse x + y
+
+Calling structure:
+
+Parse				Scans x
+	E
+		T
+			F	Recognizes x , scans + and returns to T
+				
+		T		Not scanning *, returns to E
+				
+	E	   		Scanning +, scans y and calls T			
+		T 
+			F	Recognizes  y, scans (eoln?) and returns to T
+
+		T
+
+	E
+Parse--accept
+
+
+Example: Parse x + y * z
+
+Parse				Scans x
+	E
+		T
+			F	Recognizes x, scans +  and returns to T
+		T		Not scanning *, returns to E
+	E			Scanning +; scans  y, calls T
+		T	
+			F	Recognizes y, scans *, returns to T
+		T		Scanning *, scans z, calls F
+			F	Recognizes z, scans (eoln?), returns to T
+		T
+	E
+Parse--accept
+
+ 
+Example:  Parse (x+)y
+
+Parse				
+	E
+		T
+			F		recognizes (, scans x, calls E
+				E
+					T
+						F  	recognizes x, scans +, returns to T
+					T		not scanning *; returns to E
+				E			scanning +; scans ), calls T
+					T
+						F	issues error (neither idr nor lpar)
+
+
+
+
+Example:  Parse x*(y+z)
+
+Parse   scans x
+    E
+        T
+           F   recognizes x; scans *; returns to T
+        T       scanning *; scans ( and calls F
+            F    recognizes (, scans y and calls E
+                E
+                    T
+                        F  recognizes y, scans +, returns to T
+                    T
+                E          recognizes +, scans z, calls T
+	      T    
+                       F   recognizes z, scans } and returns to T
+                    T
+                E          not scanning +, so E returns to F
+           F         recognizes ) , scans (eoln?) and returns to T
+       T
+   E
+Parse--accept
+
+
 
 - - - ---
 
