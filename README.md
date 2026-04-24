@@ -1310,6 +1310,505 @@ n3
 
 	
 
+## CS 489—Intermediate Code Generation
+
+Once the scanner has created a file of tokens for the parser, the next step in the compilartion process is to produce intermediate code—that is code that is “between” the source code and the object code.  Intermediate code enables the compiler writer to perform certain operations (type conversion, optimization) that would be more difficult at either the source code level or the machine code level.
+
+Since our project involves interpretation rather than compilation, the type of intermediate code that we’ll consider is postfix.  This is notation you should have seen with regular arithmetic.  Our job is to extend the notion of postfix to other programming constructs.
+
+Postfix for Arithmetic
+
+	Properties of Postfix
+			
+		Operations occur in execution order
+
+		No parentheses are needed
+
+		Operands occur in normal (infix) order
+
+		Operators appears immediately after their operands
+
+Examples:
+
+Infix			Postfix
+
+a*b			ab*
+
+a*b+c			ab*c+
+
+a*b+c*d		ab*cd*+
+
+a*(b+c/d)		abcd/+*
+
+
+Extending postfix to other constructs
+
+Assignment:  this is very natural    a := b  becomes a  b  :=
+
+Output:  Write a,b,c  becomes a Write  b  Write  c  Write
+
+If/then/else:  we could “invent” a ternary operator, let’s call it ? as follows:
+
+If e then st1 else st2  
+
+would be translated as
+
+e  st1  st2  ?
+
+
+There is a drawback to this technique.  We can understand this after looking at execution of Postfix expressions.
+
+
+Evaluation (interpretation) of Postfix
+
+	What makes postfix an appropriate intermediate code for interpreters is the ease with which postfix expressions are evaluated.  The basic algorithm is this:
+
+Push operands.
+When an operator is encountered, pop the operands, perform the operation, and then push the result.
+
+
+Once we understand how to interpret postfix, we should be able to see a potential problem with the ternary ? operator  defined earlier.
+
+Consider this example:
+
+If a > b then x := x + 1 else x := x – 1
+
+If we produced the following postfix:
+
+a b > x x 1 + := x x 1 - := ? 
+
+then as we scanned and interpreted the postfix string, we would do both the increment and decrement of x, even though we should only do one of those operations.
+
+Here is a suggested solution:  as we build the postfix (in a one-dimensional array), we will also make use of various “jump” operators. These operators will allow us to branch to various locations of the postfix string, allowing us to examine only the portions of the postfix string that require evaluations.
+
+
+ We will look at examples of this technique for the conditional statement, the loop statements, and simple arithmetic.
+ 
+Let us suppose we have jump operators BR (unconditional branch), BP (branch on positive), BM, BZ, BPZ, BMZ, BNZ (with the obvious interpretations).  
+
+BR is a unary operator:  n  BR  yields an unconditional branch to position n of the postfix array
+
+The other conditional jumps are binary operators:  a  n  BP yields a jump to position n if a is positive
+
+
+Example—the conditional statement
+
+Consider the following grammar rule:
+
+<condSt> ::= if <expr> <relop> <expr> then <stGroup>  [ else <stGroup> ]  fi
+
+
+Here is a recursive descent parsing method to recognize a conditional statement:
+
+Condst()					Part 1:
+  Tok = scan()						if tok == GTR 
+  Expr()						  code = BMZ
+  If tok != GTE && tok!= GT &&…			else if tok == GT
+      Halt()						  code = BM…
+  //see inserted code Part 1
+  Tok = scan()					Part2:
+  Expr()						postfix[i++] = minus
+  // see inserted code Part 2				postfix[i++] = const
+  if tok != kwThen					save1 = i
+      Halt()						i++
+  Tok = scan()						postfix[i++] = code
+  stGroup()
+  if tok == kwelse				Part 3:
+    //  see inserted code Part 3			postfix[i++]=const
+    tok = scan()						save2 = i
+    stGroup()						i++
+    //  see inserted code Part 4			postfix[i++] = BR
+  if tok!= kwendif					postfix[save1]=i
+    Halt()						
+  Tok = scan()					Part 4:													postfix[save2] = i
+ 
+Let’s consider a specific example.  Suppose we are using the code 1 for an identifier and the code 2 for a numeric constant.  Also suppose we have 4 variables in our symbol table, i, j, k,  and m, occupying positions 1 through 4, respectively.
+
+
+Consider the following statement:
+
+if   i > j then
+
+      k := k + m*6
+
+else
+
+      i := i+ 1
+
+fi
+
+
+
+Following the code on the previous page, where the postfix is built using the ‘inserted” code sections, we get the following equivalent postfix string for this statement:
+
+
+1   1   1   2   -   2   ?   BMZ   //   ? to be fixed up later
+
+
+
+1   3   1   3   1   4   2   6   *      asgn
+
+
+
+2   ?   BR   1   1   1   1   2   1   +   asgn   // first ? assigned 23 and second ? assigned 31
+
+ 
+Example:  The Loop Statement
+
+Consider the following grammar rule:  
+
+<loopSt> ::= for <idr> = <expr> to <expr> loop <stGroup> endloop
+
+
+Here is a recursive descent parsing method to recognize the loop statement:
+
+loopSt()					Part 1:
+  tok = scan()						postfix[i++]=1
+  if tok != idr						posfix[i++] = posn
+    halt()						save1 = posn
+  //see inserted code, Part 1				
+  tok = scan()
+  if tok != asgn					Part2:
+    halt()						postfix[i++]= asgn
+  tok = scan()						save2 = i
+  expr()						postfix[i++] = idr
+  //see inserted code, Part 2				postfix[i++] = save1 
+  if tok != kwTo
+    halt()					Part3:
+  tok = scan()						postfix[i++]= subt
+  expr()						save3 = i
+  //see inserted code, Part 3				i++
+  if tok != kwLoop					postfix[i++] = BM
+    halt()
+  tok = scan()					Part 4:
+  stGroup()						postfix[i++] = idr
+  // see inserted code, Part 4			postfix[i++] = save1		
+if tok != kwEndloop					postfix[i++] = idr
+  halt()							postfix[i++] = save1
+tok = scan()						postfix[i++] = const
+							postfix[i++] = 1										postfix[i++] = plus
+							postfix[i++] = asgn
+							postfix[i++] = save2
+							postfix[i++] = BR
+							postfix[save3] = i
+
+ 
+Now let’s do a specific loop example.   Suppose we are using the code 1 for an identifier and the code 2 for a numeric constant.  Also suppose we have 5 variables in our symbol table, a, b, c, d,  and x, occupying positions 1 through 5, respectively.
+
+
+
+Consider the following statement:
+
+
+for x := a+b to c-d loop
+
+	print x, x*x
+
+endloop
+
+
+
+Following the code on the previous page, where the postfix is built using the ‘inserted” code sections, we get the following equivalent postfix string for this statement:
+
+
+
+x   a   b   +   :=   x   c   d   -   -   ?   BM     // ? to be fixed up later
+
+
+
+x   print   x   x   *   print   newline
+
+
+
+x   x   1   +   :=   ?   BR  //  first ? assigned 27; second ? assigned 6
+
+
+CS 489—Intermediate Code Generation (Part 2)
+
+
+In this handout, we consider generating postfix for arithmetic expressions.  An advantage of using recursive descent is that the recursion helps the parser generate the postfix code in the proper order.
+
+Consider the following simple grammar:
+
+	E  T | E + T | E – T | -T
+
+	T  F | T * F | T / F
+
+	F  idr | (E)
+
+Rewriting in Extended BNF yields:
+
+	E  [ - ] T { ( + | - ) T }
+
+	T  F { ( *  | / )  F }
+
+	F  idr | (E)
+
+
+Here are the parsing recognition methods:
+
+E()
+
+    If tok = minus
+      Tok = scan()
+       T1()
+        // see inserted code, part1			postfix[i++]= uminus
+
+    else
+        T2()
+
+    While (tok == plus) || (tok == minus)
+        //see inserted code, part 2			oper = tok  // oper is local var
+        tok = scan()
+        T3()
+         //  see inserted code, part 3			postfix[i++]= oper
+
+ 
+T()
+  
+    F1 ()
+
+    While (tok == star) _|| (tok == dvd) 
+      //see inserted code part 1			oper = tok // oper is local var
+        tok = scan()
+        F2()
+        //  see inserted code, part 2			postfix[i++] = oper
+
+
+F()
+
+  If tok == idr
+
+           // see inserted code part 1			postfix[i++] = tok
+	Tok = scan()
+
+         // see inserted code part 2			postfix[i++]= tok
+	Tok = scan()
+
+  Else
+
+	If tok != lpar
+	    Halt(“Missing left parenthesis”)
+
+	Tok = scan()
+
+	E()
+
+	If tok != rpar
+	    Halt(“Missing right parenthesis”)
+	
+	Tok = scan()
+
+ 
+Let us consider that parse of the following expression:  a – b * ( - c / d )
+
+
+E			oper  -
+
+	T2
+		F1
+	T2
+
+E
+
+	T3			oper  *
+		F1
+	T3
+
+		F1
+			E
+				
+T1  		oper  /
+					F1
+				T1
+					F2
+				T1			(inserts / into postfix)
+
+			E			(inserts @ into postfix)
+		F2
+	T3				(inserts * into postfix)
+
+E			(inserts – into postfix)
+
+
+Here is the postfix code that is produced:
+
+a    b    c    d    /    @    *     -
+
+Note that this string provides the correct evaluation:
+
+	First divide c by d
+	Negate the quotient
+	Multiply result by b
+	Subtract this result from a
+ 
+Observe that unary minus does not have precedence over * or / .  We can tell this by noticing that unary minus in introduced into the grammar “sooner” than multiplication and division.  In the interaction of multiplication and division this typically won’t matter.  
+
+But what about a string like  - x – y?  There is some inherent ambiguity.  Should this be parsed as – (x-y) or as (-x) – y.  
+
+The original grammar makes it clear (try to build the parse tree) that we should apply the unary minus to x before performing the subtraction.  However, the revised (extended BNF) grammar doesn’t make this clear.  
+
+However, the parsing routines do in fact work correctly.  If we trace the above string through the previous methods, we do in fact get the following postfix string:  
+
+x  @  y  -
+
+
+Suppose we wanted unary minue to have precedence over the other operations.  We could accomplish this by changing the grammar:
+
+
+	E  [ - ] T { ( + | - ) T }
+
+	T  F { ( *  | / )  F }
+
+	F  idr | (E)
+
+Becomes
+
+
+	E   T { ( + | - ) T }
+
+	T  F { ( *  | / )  F }
+
+	F  idr | (E) | - F
+
+We would also need to make a simple change to the recognition methods.  Specifically, the statement that inserts unary minus into the postfix string  would be removed from the E() method and placed in the F() method.  
+
+With the first grammar above, the string – a * b would result in a postfix equivalent of:    a      b    *   @
+
+With the second grammar above, the string – a * b would result in a postfix equivalent of:  a   @   b   *
+Finally, we take a brief look at how intermediate code can be generated within a bottom-up parser.  Recall that a bottom-up parser makes use of a precedence table.  A typical algorithm finds the handle in the parse stack (a right-hand-side of a production rule) and then replaces the handle with left-hand-side nonterminal of the appropriate production rule that is found in the parsing table.
+
+Example:  Let’s return to our original grammar and number the production rules:
+
+	E  T 1 | E + T  2 | E – T  3 | -T   4
+
+	T  F   5  | T * F   6  | T / F    7
+
+	F  idr    8  | (E)   9
+
+The postfix generator can now be encapsulated in a single method.  This method is called by the parser.  Before the parser makes a reduction, it looks up the number of the production rule involved and calls the postfix generator method with a single argument, namely the production rule.
+
+The postfix generator method can be simply written as follows:
+
+postfixGen(int ruleNum):
+
+   switch (ruleNum) {
+
+	case 1:  break;
+
+	case 2:  postfix[i++]=plus;  break;
+
+	case 3:  postfix[i++]=minus;  break;
+
+	case 4:  postfix[i++]=uminus;  break;
+
+	case 5:  break;
+
+	case 6:  postfix[i++]=star;  break;
+
+	case 7:  postfix[i++]=dvd;  break;
+
+	case 8:  postfix[i++]=tok;  tok = scan; postfix[i++] = tok;  break;
+
+	case 9:  break;
+
+	default:  halt(“invalid production rule”)
+}
+ 
+Example:  Trace the pars of:   a  *  ( b + c )
+
+Stack		Rule Number		Postfix String
+
+a		8			a
+
+F		5			a
+
+T					a
+
+T*					a
+
+T*(					a
+
+T*(b		8			a  b
+
+T*(F		5			a  b
+
+T*(T		1			a  b
+
+T*(E					a  b
+
+T*(E+					a  b
+
+T*(E+c		8			a   b   c
+
+T*(E+F	5			a   b   c
+
+T*(E+T	2			a   b   c   +
+
+T*(E					a   b   c   +
+
+T*(E)		9			a   b   c   +
+
+T*F		6			a   b   c   +   *
+
+T		1			a   b   c   +   *
+
+E		accept			a   b   c   +   *
+
+
+
+
+## Finite-State Automata | A Design Aid for Scanners##
+
+
+  One possible focus of the Theory of Computation concerns abstract machines that recognize “languages”, that is, sets of strings that satisfy a certain property (e.g., contain a certain patter or obey the syntax rules of Java).  Since a compiler is also, at least on some level, a string recognizer, it’s not surprising that concepts from Theory of Computation carry over into Compiler Writing.
+
+A finite state automaton is a “transition diagram” consisting of circles (representing states) and labeled arcs (representing scanned data).  If the data scanned leads to an accepting state (drawn as a double circle), then we say that the FSA accepts the string.  The start state is denoted usually with an S or with an arrow leading to it that isn’t coming from another state.  Examples of FSAs are provided on the accompanying PDF.  These examples demonstrate how a scanner can be developed from an FSA (which is why automated scanner-generators are possible).
+
+
+Introduction to Grammars and Parsing
+
+	Once the scanner has broken the source program into a sequence of tokens, it is up to the parser to perform syntactic analysis on the tokens to see that the sequence is legal.  That is, the tokens obey the syntax rules of the language.  In terms of grammars, this means that the terminal string can be derived from the grammar rules.  Parsing techniques fall into two broad categories—top-down and bottom-up.  Before we examine parsing techniques, we first need to understand grammars.
+
+Def:  A regular grammar is a 4-tuple [N,T,P,S] where 
+N is a finite set (of nonterminals), 
+T is a finite set of terminals, where N and T are disjoint, 
+P is a finite set of production rules of the form a b where a is a nonterminal and b is either a terminal or a terminal followed by a nonterminal
+S is a nonterminal designated as the start symbol of the grammar.
+
+Here is a grammar that generates strings of 0s and 1s with an odd number of 1s:
+
+S0S|1A|1
+A0A|1S
+
+If one draws the FSA corresponding to this grammar, it is easy to see the connection between FSAs and regular grammars.  In fact, there is a theorem in Computability Theory which asserts that a language is recognized by a FSA if and only if it can be generated by a regular grammar.
+
+Regular grammars are not powerful enough to generate the sort of language that is useful in computer science.  For example, regular grammars can’t generate the language that consists of a string of a’s followed by a string of an equal number of b’s.  Compilers need to be able to recognize such languages—this is easy to see when we consider that compilers must be able to match left parentheses with right parentheses.
+
+There is a more powerful class of grammars that can generate (for the most part) the kind of languages that model programming languages.  
+
+Def:  A context-free grammar is a 4-tuple [N,T,P,S] where 
+N is a finite set (of nonterminals), 
+T is a finite set of terminals, where N and T are disjoint, 
+P is a finite set of production rules of the form a b where a is a nonterminal and b is either a finite string of terminals and/or nonterminals.
+S is a nonterminal designated as the start symbol of the grammar.
+
+
+Here is a simple CFC that generates anbn:
+
+S-> aSb | ab
+
+Here is a simple (and ambiguous) “arithmetic” grammar.
+
+EE+E | E*E | (E) | x | y | x
+
+This grammar is ambiguous because the string x+y*z can be derived in two different ways (it has two different “parse” trees).
+
+But we know that the arithmetic language is not ambiguous.  Here is an unambiguous grammar that uses left-recursion (to force left-to-right evaluation) and “levels” (to impose a precedence of operations):
+
+E  E + T | T
+T  T + F | F
+F ::= x | y | z | (E)
 
 
 
