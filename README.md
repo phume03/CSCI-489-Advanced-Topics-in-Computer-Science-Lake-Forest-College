@@ -4,17 +4,14 @@
 
 **Instructor:**  _Professor R. Holliday_
 
-**Text:**  There is no required text for this course. A standard 
-reference book is “Compilers:  Principles, Techniques, and Tools” by 
-Aho, Sethi, and Ulman (known familiarly as the “dragon book”). 
+**Text:**  There is no required text for this course. A standard reference book is “_Compilers:  Principles, Techniques, and Tools_” by **Aho, Sethi**, and **Ulman** (known familiarly as the “_dragon book_”). 
 
 
-The purpose of this course is to acquaint the student with the problems 
-involved in constructing language translators and with the tools that 
-have been developed to aid in the translator-writing process.
+The purpose of this course is to acquaint the student with the problems involved in constructing language translators and with the tools that have been developed to aid in the translator-writing process.
 
 
 The course outline is:
+
 +	Introduction
 +	Lexical Analysis
 +	Syntactic Analysis
@@ -31,6 +28,7 @@ The course outline is:
 
  
 Additional topics as time permits from among:
+
 +	Symbol tables
 +	Runtime storage allocation and organization
 +	Simple code optimization
@@ -39,37 +37,45 @@ Additional topics as time permits from among:
 
 ## Interpreters ##
 
-Compilers produce a machine code equivalent of the original source code.  Interpreters simply carry out the instructions prescribed by the source code.
+We all know that compilers produce a machine code equivalent of the original source code.  Interpreters simply carry out the instructions prescribed by the source code. You can think of the traditional _Java Compiler_ versus the _Python Interpreter_. Ofcourse, it is now possible to also interpret Java code rather than compile it, making Java more like Python and Javascript.
+
 
 Interpreters (as opposed to pure compilers) are often used:
 
-	in a debugging environment
-	for largely dynamic languages
-	for languages that are much different than machine language
+  + in a debugging environment
+  + for largely dynamic languages
+  + for languages that are much different than machine language
 
-Interpreters tend to be much slower (10-20 times?) than compilers.
+Interpreters tend to be much slower (10-20 times?) than compilers. This is because compilers compile to assembly language which is machine native language and it is executed much faster.
 
-In this handout we consider interpreters for postfix intermediate code.
+In this course we considered interpreters for _postfix intermediate code_.
 
 The basic idea applied to arithmetic expressions is:
 
-1.  Scan postfix string form left to right using an initially empty stack of values.
-2.  When an operand is scanned, stack its value
+1.  Scan postfix string from left to right using an initially empty stack of values.
+2.  When an operand is scanned, stack its value.
 3.  When a k-ary operator is scanned apply the operator to the k top stack values and replace these values by the result.
 
-Example:     a + (-b + c*d)   or   a b @ c d * + +
+**Example:** 
 
-Suppose a = 1, b = 2, c =3 , d = 4
-1+ (-2+3*4) = 1 + (-2 + 12) = 1 + (10) = 11
-Stack:  	1	1 2	1 -2	1 -2 3	1 -2 3 4	1 -2 12		1 10	11
+    a + (-b + c*d)   or   a b @ c d * + +
+    
+_Suppose a = 1, b = 2, c =3 , d = 4_
+    
+	1+ (-2+3*4) = 1 + (-2 + 12) = 1 + (10) = 11
+	
+_Stack:_ 
 
-Now we want to extend this idea to other constructs as well.
+    1	1 2	1 -2	1 -2 3	1 -2 3 4	1 -2 12		1 10	11
+
+Now, we want to extend this idea to other constructs as well.
 
 For an assignment operator, we must stack the address of the left operand because the interpreter must change the value at that address.  A RESULT IS USUALLY NOT LEFT ON THE STACK.
 
 A branch operation leaves no result on the stack either, but simply causes the interpreter to resume scanning from another point in the postfix string.
 
 To see the outline of an interpreter, let's assume we have a postfix string P, indexed by pc (for postfix counter) and a runstack RS, indexed with rsc (for runstack counter).   Both of these are implemented as one-dimensional arrays.  We assume that rsc is pointing at the actual top of the stack, and the ps is pointing at the next item to be processed.  With these assumptions, the interpreter method is essentially one large switch statement.
+
 void interpreter():   {
 
 	switch (P[pc])  {
@@ -1758,7 +1764,8 @@ E		accept			a   b   c   +   *
 
 
 
-## Finite-State Automata | A Design Aid for Scanners##
+## Finite-State Automata | A Design Aid for Scanners
+##
 
 
   One possible focus of the Theory of Computation concerns abstract machines that recognize “languages”, that is, sets of strings that satisfy a certain property (e.g., contain a certain patter or obey the syntax rules of Java).  Since a compiler is also, at least on some level, a string recognizer, it’s not surprising that concepts from Theory of Computation carry over into Compiler Writing.
