@@ -1817,6 +1817,89 @@ T  T + F | F
 F ::= x | y | z | (E)
 
 
+CS 489—SCANNER-WRITING GUIDE
+FALL, 2014
+INTRODUCTION
+The scanner is the portion of the compiler that reads language specific tokens in the source code. Once the scanner determines the token, it associates a corresponding integer code to that token. The scanner might return this to a file writer (or write directly to a file).  If the scanner is under the control of the parser, it would return this token code to the parser.  
+Only the scanner deals with the characters of the source code.  
+The rest of the compiler works with the integer codes. We should first enumerate all the tokens of the “discussion language”.  For clarity and readability, it is probably a good idea to use a mnemonic identifier for each token.  For example, if the token code for a semicolon is 12, once the scanner recognizes a semicolon, it would be better to write something like tok = SEMI rather than tok = 12. Where SEMI is a suitably defined constant:  
+	final int SEMI = 12;
+Token		Code	Mnemonic	Token	Code	Mnemonic	
+identifier		1		IDR	:=			14	ASGN
+constant	2	CONST	+	15	PLUS
+read	3	KWRD	-	16	MINUS
+write	4	KWWR	*	17	STAR
+if	5	KWIF	/	18	DVD
+then	6	KWTH	=	19	EQR
+else	7	KWEL	>	20	GTR
+fi	8	KWFI	<	21	LTR
+to	9	KWTO	<=	22	LER
+do	10	KWDO	>=	23	GER
+endloop	11	KWENDL	#	24	NER
+;	12	SEMI	(	25	LPAR
+,	13	COMMA	)	26	RPAR
+If we had a program that began:  
+Read n;
+To n do
+    F := 1; I := 0 ….
+
+The scanner should produce the following succession of “tok” values:
+	3  1  12   9  1  10  1  14  2  12 …
+Identifiers and constants (really a value) would become two-part codes. To design the scanner, we will employ the technique of the state diagram.
+•	States represented by circles
+•	S is the start state
+•	Arcs are labeled with a single character
+•	Moving along an arc corresponds to scanning a character along the arc
+•	One unlabeled arc may appear; move along this arc if the scanned character appears on no other arc
+•	If we are unable to leave a state, there is a lexical error in the program
+We will employ a simple error handler, namely print an error message and continue. Suppose ch is a character variable that holds the current input character. Since a scanner is supposed to create a listing, we might as well print the listing while we are scanning.  That is, when we read a value into ch, we also print it.
+Observe that to detect the end of a token, the first character of the following the current input character might need to be examined, as is the case in distinguishing between < and <=.  For consistency, we will always read this next character before returning from the scanner.  So when we enter the scanner each time, the first character of the next token will have been read.  One consequence of this—we should get the first character of the source code before our original call to the scanner. Assuming a couple of global variables, ch and tok, and a method getChar() which reads the next nonblank character, what follows is a very basic outline in pseudocode of a scanner for the discussion language:
+
+main()
+	ch = getChar()
+	while (ch != eof)
+		tok = scanner(ch)
+                          outFile.write(tok)
+
+getChar()
+
+scanner(ch)
+	if ch >= ‘a’ && ch<= ‘z’    // identifier or keyword
+		str = ch
+   		while (ch>=’a’ && ch<=’z’) || (ch>=’0’ && ch <= ‘9’)
+			ch = getChar()
+                                        str = str + ch
+                           for (j ==0; j<9; ++j)         //checking for keyword
+			if str = kwTable[j]
+                                              tok = kwToken[j]
+       			      kWord = true
+ 			      break
+		if !(kWord)
+ 			tok = idr
+	else if ch == ‘;’
+		tok = semi
+		ch = getChar()
+	.
+	.
+	.
+	else if ch == ‘(‘
+		tok = lpar
+		ch = getChar()
+
+	else if ch == ‘<’
+		ch = getChar()
+		if  ch == ‘=’
+		      ch = getChar()
+		      tok = ler
+		else
+		      tok = ltr
+	.
+	.
+	.
+	else
+		error(“Unrecognizable token”)
+
+			
 
 
 - - - ---
