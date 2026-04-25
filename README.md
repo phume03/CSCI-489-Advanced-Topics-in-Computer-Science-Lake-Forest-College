@@ -64,9 +64,9 @@ _Suppose a = 1, b = 2, c =3 , d = 4_
     
 	1+ (-2+3*4) = 1 + (-2 + 12) = 1 + (10) = 11
 	
-_Stack:_ 
+_Stack: this part shows what the stack during operation looks like._ 
 
-    1	1 2	1 -2	1 -2 3	1 -2 3 4	1 -2 12		1 10	11
+    1    1 2    1 -2    1 -2 3    1 -2 3 4    1 -2 12    1 10    11
 
 Now, we want to extend this idea to other constructs as well.
 
