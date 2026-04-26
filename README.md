@@ -140,58 +140,61 @@ Even if a language has only one type, there still might be more than one "type" 
 
 ##### Arrays #####
 
-If the language supports arrays, then there needs to be some sort of "subscript" operator, SUBS, that returns an address.  Consider a reference like:
+If the language supports arrays, then there needs to be some sort of "subscript" operator, _SUBS_, that returns an address.  Consider a reference like:
 
-A[3, i+j] := 17
+    A[3, i+j] := 17
 
 Then the postfix might look like this:
 
-3	i	j	+	A	SUBS   	17 	ASGN
+    3	i	j	+	A	SUBS   	17 	ASGN
 
-Remark:  Note the importance of A right before SUBS--we can look in the symbol table to confirm how many subscripts we need to process the array reference.
+**Remark:**  Note the importance of _A_ right before _SUBS_ -- we can look in the symbol table to confirm how many subscripts we need to process the array reference.
 
-And if we have a statement like this:  B := A[ 3, i + j ] then we would also need an operator (let's call is CAV for convert address to value) that would let us know that we need to fetch the value at the given address.
+And if we have a statement like this:
+
+    B := A[ 3, i + j ] 
+
+then we would also need an operator (let's call it _CAV_ for convert address to value) that would let us know that we need to fetch the value at the given address.
+
 
 
 ## Lexical Analysis Summary ##
 
-The compilation process can be divided into two major areas:  Analysis and Syntheses
+The compilation process can be divided into two major areas:  **Analysis** and **Syntheses**
 
 The analysis phase consists of:
 
-Lexical Analysis (Scanner):
-breaks the source program up into atomic units called tokens;
-often under control of the syntax analyzer
+**Lexical Analysis (Scanner):** breaks the source program up into atomic units called tokens;often under control of the syntax analyzer
 
-Syntax Analysis (parser):
-	Makes sure that the tokens occur in an order permitted by the language specification (the language’s grammar)
-	Typically constructs a parse tree
+**Syntax Analysis (parser):** makes sure that the tokens occur in an order permitted by the language specification (the language’s grammar). 	Typically constructs a parse tree.
 
-Semantic Analysis:
-	Transforms the parse tree into some intermediate form (reverse Polish, quadruples)
-	Checks context  sensitivity (i.e, type checking)
+**Semantic Analysis:** transforms the parse tree into some intermediate form (reverse Polish, quadruples). Checks context  sensitivity (i.e, type checking)
+
 
 The synthesis phase consists of:
 
-Code Optimization:  
-	Attempts to produce an intermediate version of the source which is faster and/or smaller
+**Code Optimization:** attempts to produce an intermediate version of the source which is faster and/or smaller.
 	
-Code Generation:
-	Converts the intermediate code into machine language instructions.
-	(An interpreter does not have this phase, but instead executes the intermediate code.)
+**Code Generation:**converts the intermediate code into machine language instructions (an interpreter does not have this phase, but instead executes the intermediate code).
 
 
-Other “duties”:
 
-Bookkeeping:  managing a symbol table; managing storage allocation; creating a listing
+**Other “duties”:**
 
-Error handling:  can occur in any phase; can be difficult
++ **Bookkeeping:** managing a symbol table; managing storage allocation; creating a listing.
+
++ **Error handling:** can occur in any phase; can be difficult.
+
 
 
 Some of the phases of a compiler can be automated. That is, a specification of the language to be compiled and the machine on which it is to be implemented are fed to a large program, called a “compiler-generator”, which produces some part of the compiler.  The most successful areas for this are in parser generator, and scanner generators.
-The Scanner
+
+
+##### The Scanner #####
+
 
 The scanner is that part of the compiler that reads in the original source program characters and constructs the source token—identifiers, reserved words, constants, and delimiters, e.g., *, =, (, etc.
+
 
 The scanner is usually written as a separate phase because of the need for efficiency.  That is, many compilers spend a great deal of time in the lexical analysis phase, to perhaps the scanner part could be written in machine code.
 
