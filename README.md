@@ -35,128 +35,8 @@ Additional topics as time permits from among:
 +	Error handling
 +	Translator writing systems
 
-## Interpreters ##
 
-We all know that compilers produce a machine code equivalent of the original source code.  Interpreters simply carry out the instructions prescribed by the source code. You can think of the traditional _Java Compiler_ versus the _Python Interpreter_. Ofcourse, it is now possible to also interpret Java code rather than compile it, making Java more like Python and Javascript.
-
-
-Interpreters (as opposed to pure compilers) are often used:
-
-  + in a debugging environment
-  + for largely dynamic languages
-  + for languages that are much different than machine language
-
-Interpreters tend to be much slower (10-20 times?) than compilers. This is because compilers compile to assembly language which is machine native language and it is executed much faster.
-
-In this course we considered interpreters for _postfix intermediate code_.
-
-The basic idea applied to arithmetic expressions is:
-
-1.  Scan postfix string from left to right using an initially empty stack of values.
-2.  When an operand is scanned, stack its value.
-3.  When a k-ary operator is scanned apply the operator to the k top stack values and replace these values by the result.
-
-**Example:** 
-
-    a + (-b + c*d)   or   a b @ c d * + +
-    
-_Suppose a = 1, b = 2, c =3 , d = 4_
-    
-	1+ (-2+3*4) = 1 + (-2 + 12) = 1 + (10) = 11
-	
-_Stack: this part shows what the stack during operation looks like._ 
-
-    1    1 2    1 -2    1 -2 3    1 -2 3 4    1 -2 12    1 10    11
-
-Now, we want to extend this idea to other constructs as well.
-
-For an assignment operator, we must stack the address of the left operand because the interpreter must change the value at that address.  A RESULT IS USUALLY NOT LEFT ON THE STACK. A branch operation leaves no result on the stack either, but simply causes the interpreter to resume scanning from another point in the postfix string.
-
-To see the outline of an interpreter, let's assume we have a postfix string P, indexed by postfix counter (pc) and a runstack RS, indexed with runstack counter (rsc). Both of these are implemented as one-dimensional arrays.  We assume that rsc is pointing at the actual top of the stack, and the pc is pointing at the next item to be processed.  With these assumptions, the interpreter method is essentially one large switch statement.
-
-    void interpreter():   {
-	    switch (P[pc])  {
-		    case const:
-			    RS[++rsc] = P[pc++];
-				RS[++rsc] = P[pc++];
-				break;
-			case idr:  //same as above
-			case plus:
-			    if RS[rsc-3]==idr
-				    left = symTable[RS[rsc-2]].value;
-				else
-				    left = RS[rsc-2];
-			    
-				if RS[rsc-1]==idr
-				    left = symTable[RS[rsc]].value;
-			    else
-				    left = RS[rsc];
-				
-				RS[rsc-2] = left + right;
-				RS[rsc-3]= const;
-				rsc -= 2;
-				pc++;
-				break;
-			case asgn:
-			    if RS[rsc-1]==idr
-				    symTable[RS[rsc-2]].value = symTable[RS[rsc]].value;
-				else
-				    symTable[RS[rsc-2]].value = RS[rsc];
-			    rs -= 4;
-			    pc++;
-			    break;
-			case BR:
-			    pc = RS[rsc--];
-				rsc-- ; 
-				break;    //pop the const code
-			case BMZ:
-			    if RS[rsc-2] <= 0
-				    pc = RS[rsc];
-				else
-				    pc++;
-			        rsc -= 4;
-			        break;
-					
-			....
-			default:  halt("illegal postfix code")
-        }
-    }
-
- 
-##### Type issues #####
-
-Even if a language has only one type, there still might be more than one "type" of information on the runstack.  For example, we might want to keep track of whether we are interested in an identifier's value or it's address (or position in the symbol table). There are typically two ways to handle this issue.
-
-**Implicit Method** -- let the runstack have two fields. When performing an operation, operands must be checked and converted (if necessary) and the "kind" field of the result must be set. For example, the runstack for the assignment statement a:= b might look like this
-
-    runstack   a    b 	 
-    'kind'     addr    val	
-
-
-**Explicit Method** -- in this method, the postfix generator inserts explicit conversion operations directly into the postfix string using unary operators like A (address), V (value), etc.  So the reverse polish string for an assignment statement a := b might look like this:
-
-    a  A  b  V  asgn
-
-
-##### Arrays #####
-
-If the language supports arrays, then there needs to be some sort of "subscript" operator, _SUBS_, that returns an address.  Consider a reference like:
-
-    A[3, i+j] := 17
-
-Then the postfix might look like this:
-
-    3	i	j	+	A	SUBS   	17 	ASGN
-
-**Remark:**  Note the importance of _A_ right before _SUBS_ -- we can look in the symbol table to confirm how many subscripts we need to process the array reference.
-
-And if we have a statement like this:
-
-    B := A[ 3, i + j ] 
-
-then we would also need an operator (let's call it _CAV_ for convert address to value) that would let us know that we need to fetch the value at the given address.
-
-
+- - - -
 
 ## Lexical Analysis Summary ##
 
@@ -225,6 +105,9 @@ Transition Diagrams
 
 A design aid for writing scanners is the transition diagram for finite-state automata.  These diagrams are described briefly in the “Guide to Writing a Scanner” handout.
 The use of these diagrams is essentially the basis for “scanner-generator” programs.
+
+
+- - - -
 
 ## Syntactic Analysis ##
 
@@ -610,6 +493,9 @@ $E’			$			E’
 
 $			$			accept
 
+
+
+- - - - 
 
 ### Bottom-up Parsing ###
 
@@ -1316,9 +1202,11 @@ n2	quads for <expr3>, result in T’’
 
 n3
 
-	
 
-## CS 489—Intermediate Code Generation
+	
+- - - -
+
+## CS 489—Intermediate Code Generation ##
 
 Once the scanner has created a file of tokens for the parser, the next step in the compilartion process is to produce intermediate code—that is code that is “between” the source code and the object code.  Intermediate code enables the compiler writer to perform certain operations (type conversion, optimization) that would be more difficult at either the source code level or the machine code level.
 
@@ -1819,6 +1707,134 @@ E  E + T | T
 T  T + F | F
 F ::= x | y | z | (E)
 
+
+
+- - - - 
+
+## Interpreters ##
+
+We all know that compilers produce a machine code equivalent of the original source code.  Interpreters simply carry out the instructions prescribed by the source code. You can think of the traditional _Java Compiler_ versus the _Python Interpreter_. Ofcourse, it is now possible to also interpret Java code rather than compile it, making Java more like Python and Javascript.
+
+
+Interpreters (as opposed to pure compilers) are often used:
+
+  + in a debugging environment
+  + for largely dynamic languages
+  + for languages that are much different than machine language
+
+Interpreters tend to be much slower (10-20 times?) than compilers. This is because compilers compile to assembly language which is machine native language and it is executed much faster.
+
+In this course we considered interpreters for _postfix intermediate code_.
+
+The basic idea applied to arithmetic expressions is:
+
+1.  Scan postfix string from left to right using an initially empty stack of values.
+2.  When an operand is scanned, stack its value.
+3.  When a k-ary operator is scanned apply the operator to the k top stack values and replace these values by the result.
+
+**Example:** 
+
+    a + (-b + c*d)   or   a b @ c d * + +
+    
+_Suppose a = 1, b = 2, c =3 , d = 4_
+    
+	1+ (-2+3*4) = 1 + (-2 + 12) = 1 + (10) = 11
+	
+_Stack: this part shows what the stack during operation looks like._ 
+
+    1    1 2    1 -2    1 -2 3    1 -2 3 4    1 -2 12    1 10    11
+
+Now, we want to extend this idea to other constructs as well.
+
+For an assignment operator, we must stack the address of the left operand because the interpreter must change the value at that address.  A RESULT IS USUALLY NOT LEFT ON THE STACK. A branch operation leaves no result on the stack either, but simply causes the interpreter to resume scanning from another point in the postfix string.
+
+To see the outline of an interpreter, let's assume we have a postfix string P, indexed by postfix counter (pc) and a runstack RS, indexed with runstack counter (rsc). Both of these are implemented as one-dimensional arrays.  We assume that rsc is pointing at the actual top of the stack, and the pc is pointing at the next item to be processed.  With these assumptions, the interpreter method is essentially one large switch statement.
+
+    void interpreter():   {
+	    switch (P[pc])  {
+		    case const:
+			    RS[++rsc] = P[pc++];
+				RS[++rsc] = P[pc++];
+				break;
+			case idr:  //same as above
+			case plus:
+			    if RS[rsc-3]==idr
+				    left = symTable[RS[rsc-2]].value;
+				else
+				    left = RS[rsc-2];
+			    
+				if RS[rsc-1]==idr
+				    left = symTable[RS[rsc]].value;
+			    else
+				    left = RS[rsc];
+				
+				RS[rsc-2] = left + right;
+				RS[rsc-3]= const;
+				rsc -= 2;
+				pc++;
+				break;
+			case asgn:
+			    if RS[rsc-1]==idr
+				    symTable[RS[rsc-2]].value = symTable[RS[rsc]].value;
+				else
+				    symTable[RS[rsc-2]].value = RS[rsc];
+			    rs -= 4;
+			    pc++;
+			    break;
+			case BR:
+			    pc = RS[rsc--];
+				rsc-- ; 
+				break;    //pop the const code
+			case BMZ:
+			    if RS[rsc-2] <= 0
+				    pc = RS[rsc];
+				else
+				    pc++;
+			        rsc -= 4;
+			        break;
+					
+			....
+			default:  halt("illegal postfix code")
+        }
+    }
+
+ 
+##### Type issues #####
+
+Even if a language has only one type, there still might be more than one "type" of information on the runstack.  For example, we might want to keep track of whether we are interested in an identifier's value or it's address (or position in the symbol table). There are typically two ways to handle this issue.
+
+**Implicit Method** -- let the runstack have two fields. When performing an operation, operands must be checked and converted (if necessary) and the "kind" field of the result must be set. For example, the runstack for the assignment statement a:= b might look like this
+
+    runstack   a    b 	 
+    'kind'     addr    val	
+
+
+**Explicit Method** -- in this method, the postfix generator inserts explicit conversion operations directly into the postfix string using unary operators like A (address), V (value), etc.  So the reverse polish string for an assignment statement a := b might look like this:
+
+    a  A  b  V  asgn
+
+
+##### Arrays #####
+
+If the language supports arrays, then there needs to be some sort of "subscript" operator, _SUBS_, that returns an address.  Consider a reference like:
+
+    A[3, i+j] := 17
+
+Then the postfix might look like this:
+
+    3	i	j	+	A	SUBS   	17 	ASGN
+
+**Remark:**  Note the importance of _A_ right before _SUBS_ -- we can look in the symbol table to confirm how many subscripts we need to process the array reference.
+
+And if we have a statement like this:
+
+    B := A[ 3, i + j ] 
+
+then we would also need an operator (let's call it _CAV_ for convert address to value) that would let us know that we need to fetch the value at the given address.
+
+
+
+- - - -
 
 CS 489—SCANNER-WRITING GUIDE
 FALL, 2014
