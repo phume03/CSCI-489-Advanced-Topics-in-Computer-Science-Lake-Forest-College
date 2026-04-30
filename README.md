@@ -26,7 +26,8 @@ The course outline is:
 +	Interpreters
 +	Simple code generation
 
- 
+
+
 Additional topics as time permits from among:
 
 +	Symbol tables
@@ -36,75 +37,87 @@ Additional topics as time permits from among:
 +	Translator writing systems
 
 
+
 - - - -
 
 ## Lexical Analysis Summary ##
 
 The compilation process can be divided into two major areas:  **Analysis** and **Syntheses**
 
-The analysis phase consists of:
 
-**Lexical Analysis (Scanner):** breaks the source program up into atomic units called tokens;often under control of the syntax analyzer
+The **analysis phase** consists of:
 
-**Syntax Analysis (parser):** makes sure that the tokens occur in an order permitted by the language specification (the language’s grammar). 	Typically constructs a parse tree.
++  **Lexical Analysis (Scanner):** breaks the source program up into atomic units called tokens;often under control of the syntax analyzer
 
-**Semantic Analysis:** transforms the parse tree into some intermediate form (reverse Polish, quadruples). Checks context  sensitivity (i.e, type checking)
++  **Syntax Analysis (parser):** makes sure that the tokens occur in an order permitted by the language specification (the language’s grammar). 	Typically constructs a parse tree.
+
++  **Semantic Analysis:** transforms the parse tree into some intermediate form (reverse Polish, quadruples). Checks context  sensitivity (i.e, type checking)
 
 
-The synthesis phase consists of:
 
-**Code Optimization:** attempts to produce an intermediate version of the source which is faster and/or smaller.
+The **synthesis phase** consists of:
+
++  **Code Optimization:** attempts to produce an intermediate version of the source which is faster and/or smaller.
 	
-**Code Generation:**converts the intermediate code into machine language instructions (an interpreter does not have this phase, but instead executes the intermediate code).
++  **Code Generation:**converts the intermediate code into machine language instructions (_an interpreter does not have this phase, but instead executes the intermediate code_).
 
 
 
 **Other “duties”:**
 
-+ **Bookkeeping:** managing a symbol table; managing storage allocation; creating a listing.
++  **Bookkeeping:** managing a symbol table; managing storage allocation; creating a listing.
 
-+ **Error handling:** can occur in any phase; can be difficult.
-
-
-
-Some of the phases of a compiler can be automated. That is, a specification of the language to be compiled and the machine on which it is to be implemented are fed to a large program, called a “compiler-generator”, which produces some part of the compiler.  The most successful areas for this are in parser generator, and scanner generators.
++  **Error handling:** can occur in any phase; can be difficult.
 
 
-##### The Scanner #####
 
+Some of the phases of a compiler can be automated. That is, a specification of the language to be compiled and the machine on which it is to be implemented are fed to a large program, called a “compiler-generator”, which produces some part of the compiler.  The most successful areas for this are in **parser generator**, and **scanner generators**.
+
+
+
+
+#### The Scanner ####
 
 The scanner is that part of the compiler that reads in the original source program characters and constructs the source token—identifiers, reserved words, constants, and delimiters, e.g., *, =, (, etc.
 
 
-The scanner is usually written as a separate phase because of the need for efficiency.  That is, many compilers spend a great deal of time in the lexical analysis phase, to perhaps the scanner part could be written in machine code.
+The scanner is usually written as a _separate phase_ because of the need for efficiency.  That is, many compilers spend a great deal of time in the _lexical analysis phase_, to perhaps the scanner part could be written in machine code.
 
 
-Scanner Functions:
 
-Recognition of tokens
+**Scanner Functions:**
 
-Construction of a symbol table/constant table
-Reading and printing a listing of the source program
-Skipping blanks (if blanks are insignificant)
-Conversion of constants
-Reporting lexical errors, i.e., unrecognizable keyword, illegal token
-Recovering from lexical errors
-Skipping over comments
++  Recognition of tokens
+
++  Construction of a symbol table/constant table
+
++  Reading and printing a listing of the source program
+
++  Skipping blanks (if blanks are insignificant)
+
++  Conversion of constants
+
++  Reporting lexical errors, i.e. unrecognizable keyword, illegal token
+
++  Recovering from lexical errors
+
++  Skipping over comments
 
 
-One approach
+##### One Approach #####
 
-Associate with each token an integer code.  The scanner then creates a list of integers which are the token codes corresponding to the source program.  Note that some tokens, like identifiers and constants, need at two-part code, where the second integer carries information about which identifier is being referenced or the value of a constant.
+Associate with each token an integer code.  The scanner then creates a list of integers which are the token codes corresponding to the source program. Note that some tokens, like identifiers and constants, need a two-part code, where the second integer carries information about which identifier is being referenced or the value of a constant.
+
+###### “Look-ahead” ######
+
+Scanners may need to read beyond a token to recognize which token is being processed.  For example, if a language has tokens < and <=, then after reading the < symbol, the scanner must then read the next symbol to determine which of the two tokens is actually being scanned.
 
 
-“Look-ahead”
+###### Transition Diagrams ######
 
-Scanners may need to read beyond a token to recognize which token is being processed.  For example, if a language has tokens < and <=, then after reading the < symbol, the scanner must then read the next symbol to determine which of the two tokens is actually being scanned.  
-
-Transition Diagrams
-
-A design aid for writing scanners is the transition diagram for finite-state automata.  These diagrams are described briefly in the “Guide to Writing a Scanner” handout.
+A design aid for writing scanners is the transition diagram for finite-state automata.  These diagrams are described briefly in the “_Guide to Writing a Scanner_” handout.
 The use of these diagrams is essentially the basis for “scanner-generator” programs.
+
 
 
 - - - -
@@ -114,29 +127,35 @@ The use of these diagrams is essentially the basis for “scanner-generator” p
 
 ### Top-Down Parsing ###
 
-
-In top-down parsing, we try to build the syntax tree by starting at the root and working down to the leaves.  Essentially, we try to replace nonterminals (left-hand sides of production rules) with an appropriate right-hand-side of a production rule.
-
-In a naïve approach, we simply pick an alternative right-hand-side.  If that choice turns out to be incorrect, we backtrack and try another alternative.  We can see a “bad” backtracking example if we try to parse idr + idr from the grammar that follows:
-
-	E ::= T + E | T
-	T ::= F *  T | F
-	F ::= (E) | idr
+In top-down parsing, we try to build the syntax tree by starting at the root and working down to the leaves. Essentially, we try to replace nonterminals (left-hand sides of production rules) with an appropriate right-hand-side of a production rule.
 
 
-This backtracking is highly inefficient and is, in fact, of exponential complexity in terms of the length of the string being parsed.  A compile needs to be of linear complexity to be useful.  
+In a naïve approach, we simply pick an alternative right-hand-side. If that choice turns out to be incorrect, we backtrack and try another alternative. We can see a “bad” backtracking example if we try to parse idr + idr from the grammar that follows:
 
-Also note that a “backtracking” parser might be difficult to implement, particularly if the parser and the scanner are working together as they often are, with the scanner under the control of the parser.  
 
-	Suppose we rewrite the above grammar in perhaps a more natural way (that forces left-to-right evaluation of addition and multiplication):
+    E ::= T + E | T
+    T ::= F *  T | F
+    F ::= (E) | idr
 
-	E ::= E + T | T
-	T ::= T * F | F
-	F ::= (E) | idr
 
-Now when we try to parse idr + idr, we have a different problem (if we always try the first right-hand-side alternative).  Namely, the left recursion sends us into an infinite loop.
+This backtracking is highly inefficient and is, in fact, of exponential complexity in terms of the length of the string being parsed. A compiler needs to be of linear complexity to be useful.  
 
-Thus, if we want a practical top-down parser (that builds the tree by scanning from left-to-right), we need to eliminate backtracking and left recursion.     We consider two different ways to avoid these problems.  One technique is to use theorems from “grammar theory”.  Another way is to allow additional descriptive devices for our grammar rules.
+
+Also note that a “_backtracking_” parser might be difficult to implement, particularly if the parser and the scanner are working together as they often are, with the scanner under the control of the parser.  
+
+
+Suppose we rewrite the above grammar in perhaps a more natural way (that forces left-to-right evaluation of addition and multiplication):
+
+
+    E ::= E + T | T
+    T ::= T * F | F
+    F ::= (E) | idr
+
+
+Now when we try to parse idr + idr, we have a different problem (if we always try the first right-hand-side alternative). Namely, the left recursion sends us into an infinite loop.
+
+
+Thus, if we want a practical top-down parser (that builds the tree by scanning from left-to-right), we need to eliminate backtracking and left recursion. We consider two different ways to avoid these problems.  One technique is to use theorems from “grammar theory”.  Another way is to allow additional descriptive devices for our grammar rules.
 
  
 For the first technique, let’s look at the following result:
